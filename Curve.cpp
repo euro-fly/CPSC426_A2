@@ -1,6 +1,7 @@
 #include "Curve.h"
 #include <fstream>
 #include <iostream>
+#include <cmath>
 
 const std::string gTypeKey = "Type";
 const std::string gAnchorsKey = "Anchors";
@@ -137,6 +138,7 @@ int cCurve::GetDim() const
 	// dimension of each anchor
 	int dim = 0;
 	if (GetNumAnchors() > 0)
+
 	{
 		const auto& pos = GetAnchorPos(0);
 		dim = pos.size();
@@ -148,24 +150,303 @@ void cCurve::Eval(double time, Eigen::VectorXd& out_result) const
 {
 	// TODO (CPSC426): Evaluates a parametric curve at the given time
 	out_result = Eigen::VectorXd::Zero(GetDim());
-	out_result[0] = time; // stub, position just moves along the x-axis with time
+	//out_result[0] = time; // stub, position just moves along the x-axis with time
+	
 
-	// first build the basis matrix M for the current curve tyle (mCurveType)
+	// first build the basis matrix M for the current curve type (mCurveType)
+
+	Eigen::Matrix4d M_matrix;
+	double coefficient;
+	switch (mCurveType) { // set M matrix and coefficient (1/2 or 1/6) depending on the curve type
+	case eCurveTypeCatmullRom:
+		coefficient = 0.5;
+		M_matrix << -1.0, 3.0, -3.0, 1.0,
+			2.0, -5.0, 4.0, -1.0,
+			-1.0, 0.0, 1.0, 0.0,
+			0.0, 2.0, 0.0, 0.0;
+		break;
+	case eCurveTypeBSpline:
+		coefficient = 1.0 / 6.0;
+		M_matrix << -1.0, 3.0, -3.0, 1.0,
+			3.0, -6.0, 3.0, 0.0,
+			-3.0, 0.0, 3.0, 0.0,
+			1.0, 4.0, 1.0, 0.0;
+		break;
+	default:
+		assert(false);
+		break;
+	}
 	// then build the T polynomial vector
+	int segment = (int)time;
+	double t = time - segment;
+	Eigen::Vector4d T_vector;
+	T_vector << pow(t, 3), pow(t, 2), t, 1.0;
+
 	// finally build the geometry matrix G for the curve segment
+	int dim = GetDim();
+	int anc = GetNumAnchors();
+	int seg = GetNumSegments();
+	Eigen::MatrixXd G_matrix(anc, dim);
+
+	for (int m = 0; m < anc; ++m) {
+		const tAnchor &anchor = mAnchors[m];
+		for (int n = 0; n < dim; ++n) {
+			G_matrix(m, n) = anchor.mPos[n];
+		}
+	}
+
+	Eigen::MatrixXd beg(1, dim);
+	Eigen::MatrixXd end(1, dim);
+	beg << G_matrix.row(0);
+	end << G_matrix.row(anc - 1);
+
+	int anchor_beg, anchor_end;
+	GetAnchors(segment, anchor_beg, anchor_end);
+
+	Eigen::MatrixXd G_matrixCatmull_beg(anc + 1, dim);
+	Eigen::MatrixXd G_matrixCatmull_end(anc + 1, dim);
+	Eigen::MatrixXd G_matrixBSpline_beg(anc + 4, dim);
+	Eigen::MatrixXd G_matrixBSpline_end(anc + 2, dim);
+
+	switch (mCurveType) {
+	case eCurveTypeCatmullRom:
+	
+		G_matrixCatmull_beg << beg, G_matrix;
+		G_matrixCatmull_end << G_matrix, end;
+
+		if (segment == 0) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_beg.block(0, 0, 4, dim);
+		}
+		else if ((0 < segment) && (segment < seg - 1)) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrix.block(std::max(anchor_beg, 0), 0, 4, dim);
+		}
+		else if (seg == seg - 1) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_end.block(anchor_beg, 0, 4, dim);
+		}
+		break;
+	case eCurveTypeBSpline:
+		
+		G_matrixBSpline_beg << beg, beg, G_matrix, end, end;
+		G_matrixBSpline_end << G_matrix, end;
+		if (segment == 0) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(0, 0, 4, dim);
+		}
+		else if ((0 < segment) && (segment < seg - 1)) {
+			if (anchor_beg < 0) {
+				out_result = coefficient * T_vector.transpose() * M_matrix *G_matrixBSpline_beg.block(anchor_beg + 2, 0, 4, dim);
+			}
+			else {
+				out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(anchor_beg, 0, 4, dim);
+			}
+		}
+		else if (segment == seg - 1) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_end.block(anchor_beg, 0, 4, dim);
+		}
+		break;
+	}
+
 }
 
 void cCurve::EvalTangent(double time, Eigen::VectorXd& out_result) const
 {
 	// TODO (CPSC426): Evaluates the first derivative of a curve
 	out_result = Eigen::VectorXd::Zero(GetDim()); // stub
-	out_result[0] = 1; // stub, all tangents are horizontal
+	
+
+	// so this is going to be the same as Eval, except the time is different. we're using the first derivative of t.
+
+	// first build the basis matrix M for the current curve type (mCurveType)
+
+	Eigen::Matrix4d M_matrix;
+	double coefficient;
+	switch (mCurveType) { // set M matrix and coefficient (1/2 or 1/6) depending on the curve type
+	case eCurveTypeCatmullRom:
+		coefficient = 0.5;
+		M_matrix << -1.0, 3.0, -3.0, 1.0,
+			2.0, -5.0, 4.0, -1.0,
+			-1.0, 0.0, 1.0, 0.0,
+			0.0, 2.0, 0.0, 0.0;
+		break;
+	case eCurveTypeBSpline:
+		coefficient = 1.0 / 6.0;
+		M_matrix << -1.0, 3.0, -3.0, 1.0,
+			3.0, -6.0, 3.0, 0.0,
+			-3.0, 0.0, 3.0, 0.0,
+			1.0, 4.0, 1.0, 0.0;
+		break;
+	default:
+		assert(false);
+		break;
+	}
+	// then build the T polynomial vector
+	int segment = (int)time;
+	double t = time - segment;
+	Eigen::Vector4d T_vector;
+	T_vector << 3.0 *pow(t, 2), 2.0 * t, 1.0, 0.0; // in this case, we use the first derivatives... pow(t,3) -> 3*pow(t,2), etc.
+
+	// finally build the geometry matrix G for the curve segment
+	int dim = GetDim();
+	int anc = GetNumAnchors();
+	int seg = GetNumSegments();
+	Eigen::MatrixXd G_matrix(anc, dim);
+
+	for (int m = 0; m < anc; ++m) {
+		const tAnchor &anchor = mAnchors[m];
+		for (int n = 0; n < dim; ++n) {
+			G_matrix(m, n) = anchor.mPos[n];
+		}
+	}
+
+	Eigen::MatrixXd beg(1, dim);
+	Eigen::MatrixXd end(1, dim);
+	beg << G_matrix.row(0);
+	end << G_matrix.row(anc - 1);
+
+	int anchor_beg, anchor_end;
+	GetAnchors(segment, anchor_beg, anchor_end);
+
+	Eigen::MatrixXd G_matrixCatmull_beg(anc + 1, dim);
+	Eigen::MatrixXd G_matrixCatmull_end(anc + 1, dim);
+	Eigen::MatrixXd G_matrixBSpline_beg(anc + 4, dim);
+	Eigen::MatrixXd G_matrixBSpline_end(anc + 2, dim);
+
+	switch (mCurveType) {
+	case eCurveTypeCatmullRom:
+
+		G_matrixCatmull_beg << beg, G_matrix;
+		G_matrixCatmull_end << G_matrix, end;
+
+		if (segment == 0) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_beg.block(0, 0, 4, dim);
+		}
+		else if ((0 < segment) && (segment < seg - 1)) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrix.block(std::max(anchor_beg, 0), 0, 4, dim);
+		}
+		else if (seg == seg - 1) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_end.block(anchor_beg, 0, 4, dim);
+		}
+		break;
+	case eCurveTypeBSpline:
+
+		G_matrixBSpline_beg << beg, beg, G_matrix, end, end;
+		G_matrixBSpline_end << G_matrix, end;
+		if (segment == 0) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(0, 0, 4, dim);
+		}
+		else if ((0 < segment) && (segment < seg - 1)) {
+			if (anchor_beg < 0) {
+				out_result = coefficient * T_vector.transpose() * M_matrix *G_matrixBSpline_beg.block(anchor_beg + 2, 0, 4, dim);
+			}
+			else {
+				out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(anchor_beg, 0, 4, dim);
+			}
+		}
+		else if (segment == seg - 1) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_end.block(anchor_beg, 0, 4, dim);
+		}
+		break;
+	}
 }
 
 void cCurve::EvalNormal(double time, Eigen::VectorXd& out_result) const
 {
 	// TODO (CPSC426): Evaluates the second derivative of a curve
 	out_result = Eigen::VectorXd::Zero(GetDim()); // stub
+
+	//again, this is the same!! second derivatives!!
+
+
+	// first build the basis matrix M for the current curve type (mCurveType)
+
+	Eigen::Matrix4d M_matrix;
+	double coefficient;
+	switch (mCurveType) { // set M matrix and coefficient (1/2 or 1/6) depending on the curve type
+	case eCurveTypeCatmullRom:
+		coefficient = 0.5;
+		M_matrix << -1.0, 3.0, -3.0, 1.0,
+			2.0, -5.0, 4.0, -1.0,
+			-1.0, 0.0, 1.0, 0.0,
+			0.0, 2.0, 0.0, 0.0;
+		break;
+	case eCurveTypeBSpline:
+		coefficient = 1.0 / 6.0;
+		M_matrix << -1.0, 3.0, -3.0, 1.0,
+			3.0, -6.0, 3.0, 0.0,
+			-3.0, 0.0, 3.0, 0.0,
+			1.0, 4.0, 1.0, 0.0;
+		break;
+	default:
+		assert(false);
+		break;
+	}
+	// then build the T polynomial vector
+	int segment = (int)time;
+	double t = time - segment;
+	Eigen::Vector4d T_vector;
+	T_vector << 6.0 * t, 2.0, 0.0, 0.0; // in this case, we use the second derivatives... pow(t,3) -> 3*pow(t,2) -> 6*t, etc.
+
+	// finally build the geometry matrix G for the curve segment
+	int dim = GetDim();
+	int anc = GetNumAnchors();
+	int seg = GetNumSegments();
+	Eigen::MatrixXd G_matrix(anc, dim);
+
+	for (int m = 0; m < anc; ++m) {
+		const tAnchor &anchor = mAnchors[m];
+		for (int n = 0; n < dim; ++n) {
+			G_matrix(m, n) = anchor.mPos[n];
+		}
+	}
+
+	Eigen::MatrixXd beg(1, dim);
+	Eigen::MatrixXd end(1, dim);
+	beg << G_matrix.row(0);
+	end << G_matrix.row(anc - 1);
+
+	int anchor_beg, anchor_end;
+	GetAnchors(segment, anchor_beg, anchor_end);
+
+	Eigen::MatrixXd G_matrixCatmull_beg(anc + 1, dim);
+	Eigen::MatrixXd G_matrixCatmull_end(anc + 1, dim);
+	Eigen::MatrixXd G_matrixBSpline_beg(anc + 4, dim);
+	Eigen::MatrixXd G_matrixBSpline_end(anc + 2, dim);
+
+	switch (mCurveType) {
+	case eCurveTypeCatmullRom:
+
+		G_matrixCatmull_beg << beg, G_matrix;
+		G_matrixCatmull_end << G_matrix, end;
+
+		if (segment == 0) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_beg.block(0, 0, 4, dim);
+		}
+		else if ((0 < segment) && (segment < seg - 1)) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrix.block(std::max(anchor_beg, 0), 0, 4, dim);
+		}
+		else if (seg == seg - 1) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_end.block(anchor_beg, 0, 4, dim);
+		}
+		break;
+	case eCurveTypeBSpline:
+
+		G_matrixBSpline_beg << beg, beg, G_matrix, end, end;
+		G_matrixBSpline_end << G_matrix, end;
+		if (segment == 0) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(0, 0, 4, dim);
+		}
+		else if ((0 < segment) && (segment < seg - 1)) {
+			if (anchor_beg < 0) {
+				out_result = coefficient * T_vector.transpose() * M_matrix *G_matrixBSpline_beg.block(anchor_beg + 2, 0, 4, dim);
+			}
+			else {
+				out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(anchor_beg, 0, 4, dim);
+			}
+		}
+		else if (segment == seg - 1) {
+			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_end.block(anchor_beg, 0, 4, dim);
+		}
+		break;
+	}
 }
 
 
