@@ -137,12 +137,37 @@ void cBirdScenario::UpdateCharacter()
 	double curr_time = mTime;
 	curr_time = std::fmod(curr_time, max_time);
 
+	Eigen::VectorXd evaluated_tangent;
+	Eigen::VectorXd evaluated_normal;
+
+	Eigen::Vector3d T_vector;
+	Eigen::Vector3d B_vector;
+	Eigen::Vector3d N_vector;
+
+	// Get Tangent and Normal information
+	mCurve.EvalTangent(curr_time, evaluated_tangent); // p'(t)
+	mCurve.EvalNormal(curr_time, evaluated_normal); // p''(t)
+
+	T_vector = evaluated_tangent.segment(0, 3);
+	N_vector = evaluated_normal.segment(0, 3);
+	B_vector = T_vector.cross(N_vector); // B = p'(t) x p''(t)
+	N_vector = B_vector.cross(T_vector); // N = B x T
+
+	T_vector = T_vector.normalized();
+	B_vector = B_vector.normalized();
+	N_vector = N_vector.normalized();
+
 	Eigen::VectorXd pos_data;
 	mCurve.Eval(curr_time, pos_data);
 
 	tVector pos = tVector(pos_data[0], pos_data[1], pos_data[2], 0);
 	mCharTransform.setIdentity();
+
+	mCharTransform.block(0, 0, 3, 1) = T_vector;
+	mCharTransform.block(0, 1, 3, 1) = B_vector;
+	mCharTransform.block(0, 2, 3, 1) = N_vector;
 	mCharTransform.block(0, 3, 3, 1) = pos.segment(0, 3);
+
 }
 
 void cBirdScenario::SetColor(const tVector& col)
