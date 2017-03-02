@@ -39,6 +39,7 @@ public:
 	virtual void EvalTangent(double time, Eigen::VectorXd& out_result) const;
 	virtual void EvalNormal(double time, Eigen::VectorXd& out_result) const;
 	virtual double GetMaxTime() const;
+	virtual int GetCurrentSegment(double time) const;
 
 	virtual void Add(const tAnchor& anchor);
 
