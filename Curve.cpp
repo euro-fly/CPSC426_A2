@@ -176,9 +176,12 @@ void cCurve::Eval(double time, Eigen::VectorXd& out_result) const
 		assert(false);
 		break;
 	}
+
+	M_matrix = coefficient * M_matrix;
 	// then build the T polynomial vector
 	int segment = (int)time;
-	double t = time - segment;
+	double t = time - segment; // this is how we clamp time
+
 	Eigen::Vector4d T_vector;
 	T_vector << pow(t, 3), pow(t, 2), t, 1.0;
 
@@ -215,13 +218,13 @@ void cCurve::Eval(double time, Eigen::VectorXd& out_result) const
 		G_matrixCatmull_end << G_matrix, end;
 
 		if (segment == 0) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_beg.block(0, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixCatmull_beg.block(0, 0, 4, dim);
 		}
 		else if ((0 < segment) && (segment < seg - 1)) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrix.block(std::max(anchor_beg, 0), 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrix.block(std::max(anchor_beg, 0), 0, 4, dim);
 		}
 		else if (seg == seg - 1) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_end.block(anchor_beg, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixCatmull_end.block(anchor_beg, 0, 4, dim);
 		}
 		break;
 	case eCurveTypeBSpline:
@@ -229,18 +232,18 @@ void cCurve::Eval(double time, Eigen::VectorXd& out_result) const
 		G_matrixBSpline_beg << beg, beg, G_matrix, end, end;
 		G_matrixBSpline_end << G_matrix, end;
 		if (segment == 0) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(0, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(0, 0, 4, dim);
 		}
 		else if ((0 < segment) && (segment < seg - 1)) {
 			if (anchor_beg < 0) {
-				out_result = coefficient * T_vector.transpose() * M_matrix *G_matrixBSpline_beg.block(anchor_beg + 2, 0, 4, dim);
+				out_result = T_vector.transpose() * M_matrix *G_matrixBSpline_beg.block(anchor_beg + 2, 0, 4, dim);
 			}
 			else {
-				out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(anchor_beg, 0, 4, dim);
+				out_result = T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(anchor_beg, 0, 4, dim);
 			}
 		}
 		else if (segment == seg - 1) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_end.block(anchor_beg, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixBSpline_end.block(anchor_beg, 0, 4, dim);
 		}
 		break;
 	}
@@ -278,6 +281,7 @@ void cCurve::EvalTangent(double time, Eigen::VectorXd& out_result) const
 		assert(false);
 		break;
 	}
+	M_matrix = coefficient * M_matrix;
 	// then build the T polynomial vector
 	int segment = (int)time;
 	double t = time - segment;
@@ -317,13 +321,13 @@ void cCurve::EvalTangent(double time, Eigen::VectorXd& out_result) const
 		G_matrixCatmull_end << G_matrix, end;
 
 		if (segment == 0) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_beg.block(0, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixCatmull_beg.block(0, 0, 4, dim);
 		}
 		else if ((0 < segment) && (segment < seg - 1)) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrix.block(std::max(anchor_beg, 0), 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrix.block(std::max(anchor_beg, 0), 0, 4, dim);
 		}
 		else if (seg == seg - 1) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_end.block(anchor_beg, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixCatmull_end.block(anchor_beg, 0, 4, dim);
 		}
 		break;
 	case eCurveTypeBSpline:
@@ -331,18 +335,18 @@ void cCurve::EvalTangent(double time, Eigen::VectorXd& out_result) const
 		G_matrixBSpline_beg << beg, beg, G_matrix, end, end;
 		G_matrixBSpline_end << G_matrix, end;
 		if (segment == 0) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(0, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(0, 0, 4, dim);
 		}
 		else if ((0 < segment) && (segment < seg - 1)) {
 			if (anchor_beg < 0) {
-				out_result = coefficient * T_vector.transpose() * M_matrix *G_matrixBSpline_beg.block(anchor_beg + 2, 0, 4, dim);
+				out_result = T_vector.transpose() * M_matrix *G_matrixBSpline_beg.block(anchor_beg + 2, 0, 4, dim);
 			}
 			else {
-				out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(anchor_beg, 0, 4, dim);
+				out_result = T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(anchor_beg, 0, 4, dim);
 			}
 		}
 		else if (segment == seg - 1) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_end.block(anchor_beg, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixBSpline_end.block(anchor_beg, 0, 4, dim);
 		}
 		break;
 	}
@@ -379,6 +383,8 @@ void cCurve::EvalNormal(double time, Eigen::VectorXd& out_result) const
 		assert(false);
 		break;
 	}
+
+	M_matrix = coefficient * M_matrix;
 	// then build the T polynomial vector
 	int segment = (int)time;
 	double t = time - segment;
@@ -418,13 +424,13 @@ void cCurve::EvalNormal(double time, Eigen::VectorXd& out_result) const
 		G_matrixCatmull_end << G_matrix, end;
 
 		if (segment == 0) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_beg.block(0, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixCatmull_beg.block(0, 0, 4, dim);
 		}
 		else if ((0 < segment) && (segment < seg - 1)) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrix.block(std::max(anchor_beg, 0), 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrix.block(std::max(anchor_beg, 0), 0, 4, dim);
 		}
 		else if (seg == seg - 1) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixCatmull_end.block(anchor_beg, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixCatmull_end.block(anchor_beg, 0, 4, dim);
 		}
 		break;
 	case eCurveTypeBSpline:
@@ -432,18 +438,18 @@ void cCurve::EvalNormal(double time, Eigen::VectorXd& out_result) const
 		G_matrixBSpline_beg << beg, beg, G_matrix, end, end;
 		G_matrixBSpline_end << G_matrix, end;
 		if (segment == 0) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(0, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(0, 0, 4, dim);
 		}
 		else if ((0 < segment) && (segment < seg - 1)) {
 			if (anchor_beg < 0) {
-				out_result = coefficient * T_vector.transpose() * M_matrix *G_matrixBSpline_beg.block(anchor_beg + 2, 0, 4, dim);
+				out_result = T_vector.transpose() * M_matrix *G_matrixBSpline_beg.block(anchor_beg + 2, 0, 4, dim);
 			}
 			else {
-				out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(anchor_beg, 0, 4, dim);
+				out_result = T_vector.transpose() * M_matrix * G_matrixBSpline_beg.block(anchor_beg, 0, 4, dim);
 			}
 		}
 		else if (segment == seg - 1) {
-			out_result = coefficient * T_vector.transpose() * M_matrix * G_matrixBSpline_end.block(anchor_beg, 0, 4, dim);
+			out_result = T_vector.transpose() * M_matrix * G_matrixBSpline_end.block(anchor_beg, 0, 4, dim);
 		}
 		break;
 	}
